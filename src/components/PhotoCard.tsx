@@ -1,14 +1,20 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
 import { resolvePublicAssetUrl } from '../domain/assetUrl';
 import type { CatalogPhoto } from '../types/gallery';
 
 export interface PhotoCardProps {
   photo: CatalogPhoto;
   eventName: string;
+  indexOnPage?: number;
   onOpenLightbox: (photo: CatalogPhoto) => void;
 }
 
-export function PhotoCard({ photo, eventName, onOpenLightbox }: PhotoCardProps) {
+export function PhotoCard({
+  photo,
+  eventName,
+  indexOnPage = 0,
+  onOpenLightbox,
+}: PhotoCardProps) {
   const [imageError, setImageError] = useState(false);
 
   useEffect(() => {
@@ -20,8 +26,12 @@ export function PhotoCard({ photo, eventName, onOpenLightbox }: PhotoCardProps) 
     photo.previewStatus === 'ready' && Boolean(resolvedThumbUrl) && !imageError;
   const isPortrait = photo.height > photo.width;
 
+  const cardStyle = {
+    '--card-index': Math.min(indexOnPage, 16),
+  } as CSSProperties;
+
   return (
-    <article className="photo-card" data-photo-code={photo.code}>
+    <article className="photo-card" data-photo-code={photo.code} style={cardStyle}>
       <div className="photo-card__media">
         <button
           type="button"
@@ -82,7 +92,7 @@ export function PhotoCard({ photo, eventName, onOpenLightbox }: PhotoCardProps) 
               </svg>
               <span className="photo-card__unavailable-title">Prévia indisponível</span>
               <span className="photo-card__unavailable-note">
-                Acesse o arquivo pelo Google Drive abaixo
+                Baixe o arquivo original pelo botão abaixo
               </span>
             </div>
           )}
@@ -92,15 +102,6 @@ export function PhotoCard({ photo, eventName, onOpenLightbox }: PhotoCardProps) 
       <div className="photo-card__body">
         <div className="photo-card__header-row">
           <span className="photo-card__code">{photo.code}</span>
-          <a
-            href={photo.openUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="photo-card__open-link"
-            aria-label={`Abrir ${photo.code} no Google Drive`}
-          >
-            Abrir no Drive ↗
-          </a>
         </div>
 
         {photo.downloadAvailable ? (

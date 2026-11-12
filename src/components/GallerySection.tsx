@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { filterPhotosByCode, type ResolvedCatalogState } from '../domain/catalog';
+import { gallerySound } from '../domain/soundEffects';
 import type { CatalogPhoto, GalleryConfig } from '../types/gallery';
 import { LightboxModal } from './LightboxModal';
 import { PhotoCard } from './PhotoCard';
@@ -8,6 +9,8 @@ export interface GallerySectionProps {
   config: GalleryConfig;
   catalog: ResolvedCatalogState;
 }
+
+type PageTurnDirection = 'initial' | 'next' | 'prev' | 'filter';
 
 function formatPhotoCountLabel(total: number): string {
   if (total === 0) return '0 fotos publicadas';
@@ -37,6 +40,8 @@ function buildPaginationSlots(currentPage: number, totalPages: number): Array<nu
 export function GallerySection({ config, catalog }: GallerySectionProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
+  const [pageTurnDir, setPageTurnDir] = useState<PageTurnDirection>('initial');
+  const [pageTurnCount, setPageTurnCount] = useState(0);
   const [activeLightboxId, setActiveLightboxId] = useState<string | null>(null);
   const sectionRef = useRef<HTMLElement | null>(null);
 
@@ -63,22 +68,34 @@ export function GallerySection({ config, catalog }: GallerySectionProps) {
   const handleSearchChange = (value: string) => {
     setSearchQuery(value);
     setCurrentPage(1);
+    setPageTurnDir('filter');
+    setPageTurnCount((c) => c + 1);
   };
 
   const handlePageSelect = (targetPage: number) => {
     const clamped = Math.max(1, Math.min(totalPages, targetPage));
+    if (clamped === safePage) return;
+
+    const direction: PageTurnDirection = clamped > safePage ? 'next' : 'prev';
+    setPageTurnDir(direction);
+    setPageTurnCount((c) => c + 1);
     setCurrentPage(clamped);
+
+    gallerySound.play(direction === 'next' ? 'page-turn-next' : 'page-turn-prev');
+
     if (sectionRef.current && typeof sectionRef.current.scrollIntoView === 'function') {
       sectionRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
 
   const handleOpenLightbox = (photo: CatalogPhoto) => {
+    gallerySound.play('lightbox-open');
     setActiveLightboxId(photo.fileId);
   };
 
   const handleCloseLightbox = () => {
     const closingId = activeLightboxId;
+    gallerySound.play('lightbox-close');
     setActiveLightboxId(null);
     if (closingId) {
       requestAnimationFrame(() => {
@@ -92,6 +109,15 @@ export function GallerySection({ config, catalog }: GallerySectionProps) {
 
   const isCatalogReady = catalog.state === 'ready' && catalog.totalPhotos > 0;
   const isFiltering = searchQuery.trim().length > 0;
+
+  const gridClassName =
+    pageTurnDir === 'next'
+      ? 'photo-grid photo-grid--turn-next'
+      : pageTurnDir === 'prev'
+        ? 'photo-grid photo-grid--turn-prev'
+        : pageTurnDir === 'filter'
+          ? 'photo-grid photo-grid--fade'
+          : 'photo-grid';
 
   return (
     <section
@@ -201,12 +227,18 @@ export function GallerySection({ config, catalog }: GallerySectionProps) {
           </div>
         ) : (
           <>
-            <div className="photo-grid" data-testid="photo-grid">
-              {pagePhotos.map((photo) => (
+            <div
+              key={`grid-${safePage}-${pageTurnCount}`}
+              className={gridClassName}
+              data-testid="photo-grid"
+              data-turn-direction={pageTurnDir}
+            >
+              {pagePhotos.map((photo, idx) => (
                 <PhotoCard
                   key={photo.fileId}
                   photo={photo}
                   eventName={config.eventName}
+                  indexOnPage={idx}
                   onOpenLightbox={handleOpenLightbox}
                 />
               ))}
@@ -273,6 +305,8 @@ export function GallerySection({ config, catalog }: GallerySectionProps) {
           photos={filteredPhotos}
           currentIndex={activeLightboxIndex}
           eventName={config.eventName}
+          agencyName={config.agencyName}
+          mooveLogoSrc={config.logos.moove}
           onSelectIndex={(idx) => {
             const target = filteredPhotos[idx];
             if (target) {

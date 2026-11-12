@@ -133,7 +133,7 @@ Remover um arquivo do Google Drive (ou restringir sua permissão) interrompe ime
 
 O link *Solicitar retirada de fotografia* no rodapé só aparece quando `links.photoRemovalContact` em `src/config/gallery.ts` recebe um contato real confirmado, como `mailto:...` ou WhatsApp oficial.
 
-Em arquivos muito grandes ou picos intensos de acesso simultâneo, o Google Drive pode exibir telas próprias de confirmação ou limites temporários de tráfego. Caso algum arquivo esteja com download bloqueado pelo proprietário no Drive, o card sinaliza a restrição de forma transparente e mantém o atalho *Abrir no Drive*.
+Em arquivos muito grandes ou picos intensos de acesso simultâneo, o Google Drive pode exibir telas próprias de confirmação ou limites temporários de tráfego. Caso algum arquivo esteja com download bloqueado pelo proprietário no Drive, o card sinaliza a restrição de forma transparente.
 
 ## Publicação (Deploy)
 

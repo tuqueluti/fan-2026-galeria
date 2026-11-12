@@ -70,6 +70,10 @@ describe('Interface pública da Galeria FAN 2026 (Critérios de aceite 1, 5–11
       'href',
       'https://moove.marketing/',
     );
+    expect(screen.getByRole('link', { name: 'Apresentado por Moove Connect' })).toHaveAttribute(
+      'href',
+      'https://moove.marketing/',
+    );
     expect(screen.getByText('Galeria por Moove Connect')).toBeInTheDocument();
 
     // Estado vazio sem fotos fictícias nem instruções técnicas de código/API para o visitante
@@ -127,6 +131,17 @@ describe('Interface pública da Galeria FAN 2026 (Critérios de aceite 1, 5–11
     );
     expect(firstDownload.getAttribute('href')).not.toContain('.webp');
 
+    // Nenhum atalho "Abrir no Drive" aparece nos cards
+    expect(screen.queryByText(/Abrir no Drive/i)).not.toBeInTheDocument();
+
+    // Controle de efeitos sonoros de página alterna entre ativo e mudo
+    const soundBtn = screen.getByRole('button', { name: /efeitos sonoros de página/i });
+    expect(soundBtn).toHaveAttribute('aria-pressed', 'true');
+    await user.click(soundBtn);
+    expect(soundBtn).toHaveAttribute('aria-pressed', 'false');
+    await user.click(soundBtn);
+    expect(soundBtn).toHaveAttribute('aria-pressed', 'true');
+
     // FAN-3 com prévia indisponível mostra estado de erro claro sem esconder o código
     expect(screen.getByText('Prévia indisponível')).toBeInTheDocument();
 
@@ -135,8 +150,9 @@ describe('Interface pública da Galeria FAN 2026 (Critérios de aceite 1, 5–11
       screen.getByText('Download desativado na origem (Google Drive)'),
     ).toBeInTheDocument();
 
-    // Paginação para página 2 mantém numeração real FAN-13 até FAN-24 (nunca reinicia em FAN-1)
+    // Paginação para página 2 mantém numeração real FAN-13 até FAN-24 e aplica direção da animação
     await user.click(screen.getByRole('button', { name: /Próxima/i }));
+    expect(screen.getByTestId('photo-grid')).toHaveAttribute('data-turn-direction', 'next');
     expect(screen.getByRole('link', { name: 'Baixar FAN-13 em alta ↓' })).toBeInTheDocument();
     expect(screen.queryByRole('link', { name: 'Baixar FAN-1 em alta ↓' })).not.toBeInTheDocument();
 
@@ -155,6 +171,7 @@ describe('Interface pública da Galeria FAN 2026 (Critérios de aceite 1, 5–11
 
     const dialog = screen.getByRole('dialog');
     expect(within(dialog).getByText('FAN-1')).toBeInTheDocument();
+    expect(within(dialog).queryByText(/Abrir no Drive/i)).not.toBeInTheDocument();
     const modalDownload1 = within(dialog).getByRole('link', { name: 'Baixar FAN-1 em alta ↓' });
     expect(modalDownload1).toHaveAttribute(
       'href',
@@ -163,6 +180,15 @@ describe('Interface pública da Galeria FAN 2026 (Critérios de aceite 1, 5–11
 
     await user.keyboard('{ArrowRight}');
     expect(within(dialog).getByText('FAN-2')).toBeInTheDocument();
+    expect(
+      within(dialog).getByAltText(/Fotografia FAN-2 do evento FAN 2026/i),
+    ).toHaveAttribute('data-slide-direction', 'next');
+
+    await user.keyboard('{ArrowLeft}');
+    expect(within(dialog).getByText('FAN-1')).toBeInTheDocument();
+    expect(
+      within(dialog).getByAltText(/Fotografia FAN-1 do evento FAN 2026/i),
+    ).toHaveAttribute('data-slide-direction', 'prev');
 
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();

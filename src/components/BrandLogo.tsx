@@ -7,7 +7,7 @@ export interface BrandLogoProps {
   variant: BrandVariant;
   src: string;
   alt: string;
-  context: 'header' | 'hero' | 'footer';
+  context: 'header' | 'hero' | 'lightbox' | 'footer';
   eventName?: string;
   eventSubtitle?: string;
 }

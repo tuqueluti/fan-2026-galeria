@@ -13,15 +13,23 @@ export function Footer({ config }: FooterProps) {
     <footer className="site-footer">
       <div className="container">
         <div className="site-footer__brands" aria-label="Marcas apresentadoras e institucionais">
-          <div className="site-footer__brand-item">
-            <span className="site-footer__brand-role">Apresentação</span>
+          <a
+            href={config.links.mooveWebsite || config.mooveWebsite}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="site-footer__brand-item site-footer__brand-item--moove"
+            aria-label={`Apresentação oficial por ${config.agencyName}`}
+          >
+            <span className="site-footer__brand-role site-footer__brand-role--moove">
+              Apresentação Oficial
+            </span>
             <BrandLogo
               variant="moove"
               src={config.logos.moove}
               alt={config.agencyName}
               context="footer"
             />
-          </div>
+          </a>
 
           <div className="site-footer__brand-item">
             <span className="site-footer__brand-role">Realização</span>

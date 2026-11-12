@@ -23,12 +23,28 @@ export function Hero({ config }: HeroProps) {
       <div className="container hero__inner">
         <div className="hero__eyebrow">
           <span className="hero__dot" aria-hidden="true" />
-          <span>
-            Galeria Oficial · {config.eventSubtitle}
-          </span>
+          <span>Galeria Oficial · {config.eventSubtitle}</span>
         </div>
 
-        <div className="hero__brands" aria-label="Marcas do evento">
+        <div className="hero__brands" aria-label="Marcas apresentadora e institucionais do evento">
+          <a
+            href={config.mooveWebsite}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="hero__moove-spotlight"
+            aria-label={`Apresentado por ${config.agencyName}`}
+          >
+            <span className="hero__moove-caption">Apresentado por</span>
+            <BrandLogo
+              variant="moove"
+              src={config.logos.moove}
+              alt={config.agencyName}
+              context="hero"
+            />
+          </a>
+
+          <span className="hero__brand-divider" aria-hidden="true" />
+
           <div className="hero__brand-primary">
             <BrandLogo
               variant="fan"
