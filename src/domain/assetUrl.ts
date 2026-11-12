@@ -11,8 +11,8 @@ export function resolvePublicAssetUrl(assetPath: string | null | undefined): str
     return trimmed;
   }
 
-  const meta = import.meta as ImportMeta & { env?: { BASE_URL?: string } };
-  const base = meta.env?.BASE_URL || '/';
+  const base =
+    (typeof import.meta.env !== 'undefined' ? import.meta.env.BASE_URL : './') || './';
   const normalizedBase = base.endsWith('/') ? base : `${base}/`;
   const cleanRelative = trimmed.replace(/^\.?\//, '');
   return `${normalizedBase}${cleanRelative}`;
