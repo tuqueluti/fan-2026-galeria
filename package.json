@@ -1,0 +1,37 @@
+{
+  "name": "fan-2026-galeria",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Galeria oficial de fotografias do FAN 2026 (Fórum ACIVA de Networking) apresentada pela Moove Connect",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "sync": "node scripts/sync-gallery.mjs",
+    "status": "node scripts/check-status.mjs",
+    "build": "tsc -b && vite build",
+    "sync:build": "npm run sync && npm run build",
+    "deploy": "npm run build && node scripts/deploy-gh-pages.mjs",
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.2.0",
+    "@testing-library/user-event": "^14.6.1",
+    "@types/node": "^22.13.5",
+    "@types/react": "^19.0.10",
+    "@types/react-dom": "^19.0.4",
+    "@vitejs/plugin-react": "^4.3.4",
+    "jsdom": "^26.0.0",
+    "playwright-core": "^1.51.0",
+    "sharp": "^0.33.5",
+    "typescript": "~5.7.3",
+    "vite": "^6.2.0",
+    "vitest": "^3.0.7"
+  }
+}

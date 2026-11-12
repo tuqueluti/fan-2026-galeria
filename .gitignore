@@ -1,0 +1,18 @@
+# Dependências e saída de build
+node_modules/
+dist/
+
+# Variáveis de ambiente locais com chaves de API (nunca versionar)
+.env
+.env.local
+.env.*.local
+
+# Cache local de sincronização e temporários de build
+.cache/
+*.tmp
+*.temp
+
+# Logs e sistema operacional
+npm-debug.log*
+Thumbs.db
+.DS_Store
