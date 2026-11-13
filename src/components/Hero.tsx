@@ -1,3 +1,5 @@
+import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useGenerativeBuild } from '../domain/assemblyMotion';
 import { resolvePublicAssetUrl } from '../domain/assetUrl';
 import type { GalleryConfig } from '../types/gallery';
 import { BrandLogo } from './BrandLogo';
@@ -8,9 +10,35 @@ export interface HeroProps {
 
 export function Hero({ config }: HeroProps) {
   const coverSrc = resolvePublicAssetUrl(config.coverImage);
+  const brandsRef = useRef<HTMLDivElement | null>(null);
+  const [textShown, setTextShown] = useState(false);
+
+  // Construção generativa por wireframe pontilhado e scanline no painel de marcas do evento
+  useGenerativeBuild(brandsRef, {
+    variant: 'ui',
+    mode: 'skeleton',
+    delay: 200,
+    duration: 1700,
+    keys: 3,
+    maxParts: 24,
+  });
+
+  useEffect(() => {
+    const id = requestAnimationFrame(() => {
+      setTextShown(true);
+    });
+    return () => cancelAnimationFrame(id);
+  }, []);
+
+  const titleText = `Suas fotos do ${config.eventName} estão aqui.`;
+  const words = titleText.split(' ');
 
   return (
-    <section id="topo" className="hero" aria-labelledby="hero-heading">
+    <section
+      id="topo"
+      className={textShown ? 'hero is-assembled' : 'hero'}
+      aria-labelledby="hero-heading"
+    >
       {coverSrc ? (
         <div className="hero__cover" aria-hidden="true">
           <img src={coverSrc} alt="" className="hero__cover-img" decoding="async" />
@@ -21,29 +49,20 @@ export function Hero({ config }: HeroProps) {
       )}
 
       <div className="container hero__inner">
-        <div className="hero__eyebrow">
+        <div className="hero__eyebrow hero-assemble-step hero-assemble-step--1">
           <span className="hero__dot" aria-hidden="true" />
           <span>Galeria Oficial · {config.eventSubtitle}</span>
         </div>
 
-        <div className="hero__brands" aria-label="Marcas apresentadora e institucionais do evento">
-          <a
-            href={config.mooveWebsite}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="hero__moove-spotlight"
-            aria-label={`Apresentado por ${config.agencyName}`}
-          >
-            <span className="hero__moove-caption">Apresentado por</span>
-            <BrandLogo
-              variant="moove"
-              src={config.logos.moove}
-              alt={config.agencyName}
-              context="hero"
-            />
-          </a>
-
-          <span className="hero__brand-divider" aria-hidden="true" />
+        <div
+          ref={brandsRef}
+          className="hero__brands"
+          aria-label="Marcas institucionais do evento"
+        >
+          <span className="blueprint-corner blueprint-corner--tl" aria-hidden="true" />
+          <span className="blueprint-corner blueprint-corner--tr" aria-hidden="true" />
+          <span className="blueprint-corner blueprint-corner--bl" aria-hidden="true" />
+          <span className="blueprint-corner blueprint-corner--br" aria-hidden="true" />
 
           <div className="hero__brand-primary">
             <BrandLogo
@@ -70,14 +89,24 @@ export function Hero({ config }: HeroProps) {
         </div>
 
         <h1 id="hero-heading" className="hero__title">
-          Suas fotos do {config.eventName} estão aqui.
+          {words.map((word, idx) => (
+            <span key={`${word}-${idx}`}>
+              <span
+                className="hero__word"
+                style={{ '--word-index': idx } as CSSProperties}
+              >
+                {word}
+              </span>
+              {idx < words.length - 1 ? ' ' : ''}
+            </span>
+          ))}
         </h1>
 
-        <p className="hero__subtitle">
+        <p className="hero__subtitle hero-assemble-step hero-assemble-step--2">
           Encontre seu momento e baixe gratuitamente a foto original em alta resolução.
         </p>
 
-        <div className="hero__actions">
+        <div className="hero__actions hero-assemble-step hero-assemble-step--3">
           <a href="#galeria" className="btn-primary">
             <span>Ver fotos do evento</span>
             <svg

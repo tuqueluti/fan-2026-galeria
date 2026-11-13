@@ -1,4 +1,5 @@
 import { useMemo, useRef, useState } from 'react';
+import { useScrollAssembly } from '../domain/assemblyMotion';
 import { filterPhotosByCode, type ResolvedCatalogState } from '../domain/catalog';
 import { gallerySound } from '../domain/soundEffects';
 import type { CatalogPhoto, GalleryConfig } from '../types/gallery';
@@ -44,6 +45,9 @@ export function GallerySection({ config, catalog }: GallerySectionProps) {
   const [pageTurnCount, setPageTurnCount] = useState(0);
   const [activeLightboxId, setActiveLightboxId] = useState<string | null>(null);
   const sectionRef = useRef<HTMLElement | null>(null);
+  const { ref: toolbarRef, isAssembled: toolbarAssembled } = useScrollAssembly<HTMLDivElement>({
+    threshold: 0.15,
+  });
 
   const pageSize = Math.max(1, config.pagination.pageSize || 24);
 
@@ -127,7 +131,10 @@ export function GallerySection({ config, catalog }: GallerySectionProps) {
       aria-labelledby="gallery-heading"
     >
       <div className="container">
-        <div className="gallery-toolbar">
+        <div
+          ref={toolbarRef}
+          className={toolbarAssembled ? 'gallery-toolbar is-assembled' : 'gallery-toolbar'}
+        >
           <div className="gallery-toolbar__info">
             <h2 id="gallery-heading" className="gallery-toolbar__title">
               Fotografias do evento

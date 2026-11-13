@@ -1,4 +1,10 @@
-import { useEffect, useState, type CSSProperties } from 'react';
+import {
+  useEffect,
+  useState,
+  type CSSProperties,
+  type PointerEvent as ReactPointerEvent,
+} from 'react';
+import { useScrollAssembly } from '../domain/assemblyMotion';
 import { resolvePublicAssetUrl } from '../domain/assetUrl';
 import type { CatalogPhoto } from '../types/gallery';
 
@@ -16,6 +22,10 @@ export function PhotoCard({
   onOpenLightbox,
 }: PhotoCardProps) {
   const [imageError, setImageError] = useState(false);
+  const { ref, isAssembled } = useScrollAssembly<HTMLElement>({
+    threshold: 0.08,
+    rootMargin: '0px 0px -16px 0px',
+  });
 
   useEffect(() => {
     setImageError(false);
@@ -28,11 +38,31 @@ export function PhotoCard({
 
   const cardStyle = {
     '--card-index': Math.min(indexOnPage, 16),
+    '--col-stagger': `${(indexOnPage % 4) * 65}ms`,
   } as CSSProperties;
 
+  const handlePointerMove = (e: ReactPointerEvent<HTMLElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    if (rect.width === 0) return;
+    e.currentTarget.style.setProperty('--spot-x', `${(e.clientX - rect.left).toFixed(0)}px`);
+    e.currentTarget.style.setProperty('--spot-y', `${(e.clientY - rect.top).toFixed(0)}px`);
+  };
+
   return (
-    <article className="photo-card" data-photo-code={photo.code} style={cardStyle}>
+    <article
+      ref={ref}
+      className={isAssembled ? 'photo-card is-assembled' : 'photo-card'}
+      data-photo-code={photo.code}
+      style={cardStyle}
+      onPointerMove={handlePointerMove}
+    >
+      <span className="photo-card__corner photo-card__corner--tl" aria-hidden="true" />
+      <span className="photo-card__corner photo-card__corner--tr" aria-hidden="true" />
+      <span className="photo-card__corner photo-card__corner--bl" aria-hidden="true" />
+      <span className="photo-card__corner photo-card__corner--br" aria-hidden="true" />
+
       <div className="photo-card__media">
+        <span className="photo-card__scanline" aria-hidden="true" />
         <button
           type="button"
           className="photo-card__preview-btn"

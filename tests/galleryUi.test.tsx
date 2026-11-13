@@ -1,4 +1,4 @@
-import { render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { App } from '../src/App';
@@ -70,11 +70,24 @@ describe('Interface pública da Galeria FAN 2026 (Critérios de aceite 1, 5–11
       'href',
       'https://moove.marketing/',
     );
-    expect(screen.getByRole('link', { name: 'Apresentado por Moove Connect' })).toHaveAttribute(
-      'href',
-      'https://moove.marketing/',
-    );
+    const mastheadBrand = screen.getByRole('link', { name: 'Apresentado por Moove Connect' });
+    expect(mastheadBrand).toHaveAttribute('href', 'https://moove.marketing/');
+    expect(mastheadBrand.querySelector('.brand-logo--moove.brand-logo--header')).not.toBeNull();
+    expect(document.querySelector('.site-header__stage')).not.toBeNull();
+    expect(document.querySelectorAll('.hero__word').length).toBeGreaterThanOrEqual(6);
     expect(screen.getByText('Galeria por Moove Connect')).toBeInTheDocument();
+
+    // Barra flutuante compacta (dock) permanece oculta no topo e surge ao rolar a página
+    expect(
+      screen.queryByRole('region', { name: 'Atalhos rápidos da galeria' }),
+    ).not.toBeInTheDocument();
+    Object.defineProperty(window, 'scrollY', { value: 420, configurable: true, writable: true });
+    fireEvent.scroll(window);
+    expect(
+      screen.getByRole('region', { name: 'Atalhos rápidos da galeria' }),
+    ).toBeInTheDocument();
+    Object.defineProperty(window, 'scrollY', { value: 0, configurable: true, writable: true });
+    fireEvent.scroll(window);
 
     // Estado vazio sem fotos fictícias nem instruções técnicas de código/API para o visitante
     expect(screen.getByText('0 fotos publicadas')).toBeInTheDocument();
