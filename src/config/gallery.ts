@@ -22,15 +22,40 @@ export const galleryConfig: GalleryConfig = {
   organizerName: 'ACIVA',
   photoPrefix: 'FAN',
 
-  // Modo de origem: "folder" (pasta do Google Drive via build sync) ou "manual" (lista `photos` abaixo)
+  // Modo de origem: "folder" (pastas do Google Drive via build sync) ou "manual" (lista `photos` abaixo)
   sourceMode: 'folder',
 
-  // Pasta pública oficial do evento no Google Drive ("Qualquer pessoa com o link pode ver")
+  // Pasta principal de referência (mantida alinhada à primeira pasta para compatibilidade com modo único)
   driveFolderUrl:
-    'https://drive.google.com/drive/folders/1Lnh0VZpmXKEU8YLWIGv86oz0s9mpJWXu?usp=sharing',
+    'https://drive.google.com/drive/folders/1QFfJWszyaxW0bu9ezGU6E1GDo5BUoD9E',
 
-  // Ativado explicitamente para varrer subpastas do evento (ex.: "Dia 01", "Dia 02") dentro da pasta raiz.
-  includeSubfolders: true,
+  // Pastas interativas exibidas na galeria (sincronizadas na ordem abaixo)
+  folders: [
+    {
+      id: 'dia-01',
+      title: 'Dia 01',
+      subtitle: 'Abertura, estandes e palestras',
+      driveFolderUrl: 'https://drive.google.com/drive/folders/1QFfJWszyaxW0bu9ezGU6E1GDo5BUoD9E',
+      includeSubfolders: false,
+    },
+    {
+      id: 'rodada-negocios',
+      title: 'Rodada de Negócios',
+      subtitle: 'Conexões empresariais ACIVA',
+      driveFolderUrl: 'https://drive.google.com/drive/folders/1Tk8_I4Mo30KTjYS8qNP27EnBF5EhOiBU',
+      includeSubfolders: false,
+    },
+    {
+      id: 'dia-02',
+      title: 'Dia 02',
+      subtitle: 'Painéis, networking e encerramento',
+      driveFolderUrl: 'https://drive.google.com/drive/folders/13YG0dvKlxS-2emgQROl-HCgNHJswMRxB',
+      includeSubfolders: false,
+    },
+  ],
+
+  // Por padrão percorre apenas arquivos diretos de cada pasta configurada
+  includeSubfolders: false,
 
   // Link principal da Moove Connect (mantido também em `links` para conveniência)
   mooveWebsite: 'https://moove.marketing/',

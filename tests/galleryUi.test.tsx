@@ -206,4 +206,58 @@ describe('Interface pública da Galeria FAN 2026 (Critérios de aceite 1, 5–11
     await user.keyboard('{Escape}');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
+
+  it('alterna entre as pastas Dia 01, Rodada de Negócios e Dia 02 disparando animação de saída e ordenação das miniaturas', async () => {
+    const user = userEvent.setup();
+    const baseManifest = createManifestWithPhotos(30);
+    const taggedPhotos: ManifestPhotoItem[] = baseManifest.photos.map((p, idx) => {
+      if (idx < 10) return { ...p, folderId: 'dia-01', folderTitle: 'Dia 01' };
+      if (idx < 20) return { ...p, folderId: 'rodada-negocios', folderTitle: 'Rodada de Negócios' };
+      return { ...p, folderId: 'dia-02', folderTitle: 'Dia 02' };
+    });
+
+    const multiManifest: GalleryManifest = {
+      ...baseManifest,
+      folderId: '1QFfJWszyaxW0bu9ezGU6E1GDo5BUoD9E',
+      photos: taggedPhotos,
+    };
+
+    render(<App config={galleryConfig} manifest={multiManifest} />);
+
+    const folderGroup = screen.getByRole('group', { name: 'Pastas de fotografias do evento' });
+    const btnDia01 = within(folderGroup).getByRole('button', { name: /Dia 01/i });
+    const btnRodada = within(folderGroup).getByRole('button', { name: /Rodada de Negócios/i });
+    const btnDia02 = within(folderGroup).getByRole('button', { name: /Dia 02/i });
+
+    expect(btnDia01).toHaveAttribute('aria-pressed', 'true');
+    expect(btnRodada).toHaveAttribute('aria-pressed', 'false');
+    expect(btnDia02).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.getByTestId('photo-grid')).toHaveAttribute('data-active-folder', 'dia-01');
+    expect(screen.getByRole('link', { name: 'Baixar FAN-1 em alta ↓' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Baixar FAN-11 em alta ↓' })).not.toBeInTheDocument();
+
+    // Clica na pasta Rodada de Negócios: dispara burst seq=1 e exibe FAN-11..FAN-20
+    await user.click(btnRodada);
+    expect(btnRodada).toHaveAttribute('aria-pressed', 'true');
+    expect(btnDia01).toHaveAttribute('aria-pressed', 'false');
+    const gridAfterRodada = screen.getByTestId('photo-grid');
+    expect(gridAfterRodada).toHaveAttribute('data-active-folder', 'rodada-negocios');
+    expect(gridAfterRodada).toHaveAttribute('data-turn-direction', 'folder-burst');
+    expect(gridAfterRodada).toHaveAttribute('data-burst-seq', '1');
+    expect(screen.getByRole('link', { name: 'Baixar FAN-11 em alta ↓' })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Baixar FAN-1 em alta ↓' })).not.toBeInTheDocument();
+
+    // Clica na pasta Dia 02: dispara burst seq=2 e exibe FAN-21..FAN-30
+    await user.click(btnDia02);
+    expect(btnDia02).toHaveAttribute('aria-pressed', 'true');
+    const gridAfterDia02 = screen.getByTestId('photo-grid');
+    expect(gridAfterDia02).toHaveAttribute('data-active-folder', 'dia-02');
+    expect(gridAfterDia02).toHaveAttribute('data-burst-seq', '2');
+    expect(screen.getByRole('link', { name: 'Baixar FAN-21 em alta ↓' })).toBeInTheDocument();
+
+    // Busca direta por código encontra fotografia de qualquer pasta sem renumerar
+    const searchInput = screen.getByLabelText('Buscar pelo código');
+    await user.type(searchInput, 'FAN-5');
+    expect(screen.getByRole('link', { name: 'Baixar FAN-5 em alta ↓' })).toBeInTheDocument();
+  });
 });

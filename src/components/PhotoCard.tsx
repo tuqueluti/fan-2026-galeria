@@ -12,6 +12,7 @@ export interface PhotoCardProps {
   photo: CatalogPhoto;
   eventName: string;
   indexOnPage?: number;
+  dealtFromFolder?: boolean;
   onOpenLightbox: (photo: CatalogPhoto) => void;
 }
 
@@ -19,6 +20,7 @@ export function PhotoCard({
   photo,
   eventName,
   indexOnPage = 0,
+  dealtFromFolder = false,
   onOpenLightbox,
 }: PhotoCardProps) {
   const [imageError, setImageError] = useState(false);
@@ -26,6 +28,7 @@ export function PhotoCard({
     threshold: 0.08,
     rootMargin: '0px 0px -16px 0px',
   });
+  const effectiveAssembled = dealtFromFolder || isAssembled;
 
   useEffect(() => {
     setImageError(false);
@@ -48,10 +51,16 @@ export function PhotoCard({
     e.currentTarget.style.setProperty('--spot-y', `${(e.clientY - rect.top).toFixed(0)}px`);
   };
 
+  const cardClassName = dealtFromFolder
+    ? 'photo-card is-assembled photo-card--dealt'
+    : effectiveAssembled
+      ? 'photo-card is-assembled'
+      : 'photo-card';
+
   return (
     <article
       ref={ref}
-      className={isAssembled ? 'photo-card is-assembled' : 'photo-card'}
+      className={cardClassName}
       data-photo-code={photo.code}
       style={cardStyle}
       onPointerMove={handlePointerMove}

@@ -10,7 +10,8 @@ export type PageSoundKind =
   | 'page-turn-next'
   | 'page-turn-prev'
   | 'lightbox-open'
-  | 'lightbox-close';
+  | 'lightbox-close'
+  | 'folder-burst';
 
 const STORAGE_KEY = 'fan2026_sound_enabled';
 
@@ -160,6 +161,32 @@ class GallerySoundEngine {
           q: 1.8,
           peakGain: 0.09,
           bodyFreq: 130,
+        });
+        return;
+      }
+
+      if (kind === 'folder-burst') {
+        // Abertura tátil da aba da pasta seguida por cascata rápida de fotos saindo e se ordenando
+        this.triggerPaperFolio(ctx, t0, {
+          duration: 0.14,
+          startFreq: 680,
+          peakFreq: 1850,
+          endFreq: 1220,
+          q: 1.5,
+          peakGain: 0.14,
+          bodyFreq: 150,
+        });
+        const dealOffsets = [0.055, 0.105, 0.155, 0.21];
+        dealOffsets.forEach((offset, idx) => {
+          this.triggerPaperFolio(ctx, t0 + offset, {
+            duration: 0.085,
+            startFreq: 1100 + idx * 140,
+            peakFreq: 2450 + idx * 120,
+            endFreq: 1350 + idx * 90,
+            q: 2.0,
+            peakGain: 0.075 - idx * 0.008,
+            bodyFreq: 195 + idx * 16,
+          });
         });
       }
     } catch {

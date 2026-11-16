@@ -7,6 +7,7 @@ import sharp from 'sharp';
 import {
   isEligibleDriveImage,
   normalizeManualPhotoEntries,
+  resolveConfiguredFolders,
   sortDriveFilesDeterministically,
   type RawDriveFileMetadata,
 } from '../domain/catalog';
@@ -22,6 +23,7 @@ import {
 import type {
   GalleryConfig,
   GalleryManifest,
+  ManifestFolderSummary,
   ManifestPhotoItem,
   ManualPhotoInput,
 } from '../types/gallery';
@@ -136,7 +138,7 @@ function createEmptyStats(): SyncStats {
 
 function clampConcurrency(value: number | undefined): number {
   if (!value || !Number.isFinite(value)) return 4;
-  return Math.max(1, Math.min(8, Math.floor(value)));
+  return Math.max(1, Math.min(16, Math.floor(value)));
 }
 
 function redactSecrets(text: string, apiKey?: string): string {
@@ -475,18 +477,28 @@ async function prepareDurablePreviewsForDriveItem(options: {
     file.imageMediaMetadata?.height ?? 0,
   );
 
-  // 1) Tenta obter miniatura ampliada no build via thumbnailLink, validando qualidade real
-  if (file.thumbnailLink && file.hasThumbnail !== false) {
+  // 1) Tenta obter prévia em alta (1600px) em tempo de build, validando qualidade real antes de gravar WebP local
+  const buildTimePreviewUrl =
+    file.thumbnailLink && file.hasThumbnail !== false
+      ? upgradeDriveThumbnailSize(file.thumbnailLink, 1600)
+      : !file.thumbnailLink && file.hasThumbnail !== false
+        ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(cleanId)}${
+            file.resourceKey ? `&resourcekey=${encodeURIComponent(file.resourceKey)}` : ''
+          }&sz=w1600`
+        : null;
+
+  if (buildTimePreviewUrl) {
     try {
-      const upgradedThumbUrl = upgradeDriveThumbnailSize(file.thumbnailLink, 1600);
-      const thumbBuf = await fetchBufferChecked(upgradedThumbUrl, {}, fetchImpl);
+      const thumbBuf = await fetchBufferChecked(buildTimePreviewUrl, {}, fetchImpl);
       const meta = await sharp(thumbBuf, { failOn: 'truncated' }).metadata();
       const fetchedMaxSide = Math.max(meta.width ?? 0, meta.height ?? 0);
 
-      // Se o original é grande (> 900px), exige pelo menos 700px na captura para não degradar o lightbox
+      // Se o original é grande (> 900px) ou dimensão original é desconhecida (0), exige >= 700px para nitidez no lightbox
       const qualityIsSufficient =
         fetchedMaxSide >= MIN_PHOTO_DIMENSION &&
-        (knownOriginalMaxSide <= 900 || fetchedMaxSide >= 700);
+        (knownOriginalMaxSide > 0 && knownOriginalMaxSide <= 900
+          ? true
+          : fetchedMaxSide >= 700);
 
       if (qualityIsSufficient) {
         const generated = await writeWebpPreviewsFromInput(
@@ -1021,25 +1033,44 @@ export async function runGallerySync(options: SyncOptions): Promise<SyncResult> 
     });
   }
 
-  // Modo pasta ("folder")
-  const parsedFolder = parseDriveFolderInput(config.driveFolderUrl);
-  if (parsedFolder.kind === 'unconfigured') {
-    return {
-      ok: false,
-      code: 'UNCONFIGURED_FOLDER',
-      message:
-        'O link da pasta ainda não foi configurado em `src/config/gallery.ts` (`driveFolderUrl`). Cole o link público da pasta do Google Drive antes de sincronizar.',
-      stats,
-    };
-  }
+  // Modo pasta ("folder"): suporta pasta única ou múltiplas pastas declaradas em `config.folders`
+  const configuredFolders = resolveConfiguredFolders(config);
+  const parsedFolders: Array<{
+    id: string;
+    title: string;
+    subtitle?: string;
+    includeSubfolders: boolean;
+    driveFolderId: string;
+    resourceKey?: string;
+  }> = [];
 
-  if (parsedFolder.kind === 'invalid') {
-    return {
-      ok: false,
-      code: 'INVALID_FOLDER_URL',
-      message: parsedFolder.reason,
-      stats,
-    };
+  for (const folderCfg of configuredFolders) {
+    const parsed = parseDriveFolderInput(folderCfg.driveFolderUrl);
+    if (parsed.kind === 'unconfigured') {
+      return {
+        ok: false,
+        code: 'UNCONFIGURED_FOLDER',
+        message:
+          'O link da pasta ainda não foi configurado em `src/config/gallery.ts` (`driveFolderUrl` / `folders`). Cole o link público da pasta do Google Drive antes de sincronizar.',
+        stats,
+      };
+    }
+    if (parsed.kind === 'invalid') {
+      return {
+        ok: false,
+        code: 'INVALID_FOLDER_URL',
+        message: `Pasta "${folderCfg.title}": ${parsed.reason}`,
+        stats,
+      };
+    }
+    parsedFolders.push({
+      id: folderCfg.id,
+      title: folderCfg.title,
+      subtitle: folderCfg.subtitle,
+      includeSubfolders: folderCfg.includeSubfolders ?? config.includeSubfolders,
+      driveFolderId: parsed.folderId,
+      resourceKey: parsed.resourceKey,
+    });
   }
 
   const trimmedKey = (apiKey ?? '').trim();
@@ -1055,57 +1086,91 @@ export async function runGallerySync(options: SyncOptions): Promise<SyncResult> 
     };
   }
 
-  logger.info(
-    `[SYNC] Consultando pasta do Google Drive (${parsedFolder.folderId})${config.includeSubfolders ? ' incluindo subpastas' : ''}...`,
-  );
+  const seenGlobalIds = new Set<string>();
+  const taggedFiles: Array<{
+    file: RawDriveFileMetadata;
+    albumId: string;
+    albumTitle: string;
+    driveFolderId: string;
+    folderResourceKey?: string;
+  }> = [];
 
-  const listResult = hasApiKey
-    ? await listFolderFilesPaginated({
-        rootFolderId: parsedFolder.folderId,
-        rootResourceKey: parsedFolder.resourceKey,
-        includeSubfolders: config.includeSubfolders,
-        apiKey: trimmedKey,
-        fetchImpl,
+  for (const pf of parsedFolders) {
+    logger.info(
+      `[SYNC] Consultando pasta "${pf.title}" (${pf.driveFolderId})${pf.includeSubfolders ? ' incluindo subpastas' : ''}...`,
+    );
+
+    const listResult = hasApiKey
+      ? await listFolderFilesPaginated({
+          rootFolderId: pf.driveFolderId,
+          rootResourceKey: pf.resourceKey,
+          includeSubfolders: pf.includeSubfolders,
+          apiKey: trimmedKey,
+          fetchImpl,
+          stats,
+          logger,
+        })
+      : await externalFolderLister!({
+          rootFolderId: pf.driveFolderId,
+          rootResourceKey: pf.resourceKey,
+          includeSubfolders: pf.includeSubfolders,
+          stats,
+          logger,
+        });
+
+    if (!listResult.ok) {
+      return {
+        ok: false,
+        code: 'DRIVE_ACCESS_ERROR',
+        message: `Pasta "${pf.title}": ${listResult.message}`,
         stats,
-        logger,
-      })
-    : await externalFolderLister!({
-        rootFolderId: parsedFolder.folderId,
-        rootResourceKey: parsedFolder.resourceKey,
-        includeSubfolders: config.includeSubfolders,
-        stats,
-        logger,
+      };
+    }
+
+    const sortedInFolder = sortDriveFilesDeterministically(listResult.files, config.sorting.by);
+    stats.duplicatesRemoved += listResult.files.length - sortedInFolder.length;
+
+    let addedInFolder = 0;
+    for (const file of sortedInFolder) {
+      const cleanId = sanitizeFileIdForFilename(file.id);
+      if (seenGlobalIds.has(cleanId)) {
+        stats.duplicatesRemoved += 1;
+        continue;
+      }
+      seenGlobalIds.add(cleanId);
+      taggedFiles.push({
+        file,
+        albumId: pf.id,
+        albumTitle: pf.title,
+        driveFolderId: pf.driveFolderId,
+        folderResourceKey: pf.resourceKey,
       });
+      addedInFolder += 1;
+    }
 
-  if (!listResult.ok) {
-    return {
-      ok: false,
-      code: 'DRIVE_ACCESS_ERROR',
-      message: listResult.message,
-      stats,
-    };
+    logger.info(`[SYNC]   -> "${pf.title}": ${addedInFolder} foto(s) válida(s).`);
   }
 
-  const orderedUniqueFiles = sortDriveFilesDeterministically(listResult.files, config.sorting.by);
-  stats.duplicatesRemoved = listResult.files.length - orderedUniqueFiles.length;
-  stats.validPhotos = orderedUniqueFiles.length;
+  stats.validPhotos = taggedFiles.length;
 
   logger.info(
-    `[SYNC] ${orderedUniqueFiles.length} foto(s) válida(s) encontrada(s) em ${stats.pagesFetched} página(s). Gerando prévias leves (concorrência: ${concurrency})...`,
+    `[SYNC] Total consolidado: ${taggedFiles.length} foto(s) em ${parsedFolders.length} pasta(s). Gerando prévias leves (concorrência: ${concurrency})...`,
   );
 
   const cachePath = path.join(projectRoot, '.cache', 'gallery-sync-cache.json');
   const cache = await loadSyncCache(cachePath);
+  let processedCount = 0;
 
   const manifestItems = await runWithConcurrency(
-    orderedUniqueFiles,
+    taggedFiles,
     concurrency,
-    async (file): Promise<ManifestPhotoItem> => {
+    async (entry): Promise<ManifestPhotoItem> => {
+      const { file, albumId, albumTitle, driveFolderId, folderResourceKey } = entry;
       const cleanId = sanitizeFileIdForFilename(file.id);
       const previewRes = await prepareDurablePreviewsForDriveItem({
         file,
-        folderId: parsedFolder.folderId,
-        folderResourceKey: parsedFolder.resourceKey,
+        folderId: driveFolderId,
+        folderResourceKey,
         apiKey: hasApiKey ? trimmedKey : undefined,
         projectRoot,
         cache,
@@ -1120,6 +1185,13 @@ export async function runGallerySync(options: SyncOptions): Promise<SyncResult> 
         stats.generatedPreviews += 1;
       } else {
         stats.failedPreviews += 1;
+      }
+
+      processedCount += 1;
+      if (processedCount % 50 === 0 || processedCount === taggedFiles.length) {
+        logger.info(
+          `[SYNC] Progresso de prévias: ${processedCount}/${taggedFiles.length} (cache: ${stats.cacheHits}, novas: ${stats.generatedPreviews})`,
+        );
       }
 
       const downloadAllowed =
@@ -1141,6 +1213,7 @@ export async function runGallerySync(options: SyncOptions): Promise<SyncResult> 
       return {
         fileId: cleanId,
         ...(file.name ? { originalName: file.name } : {}),
+        ...(parsedFolders.length > 1 ? { folderId: albumId, folderTitle: albumTitle } : {}),
         thumbUrl: previewRes.thumbUrl,
         previewUrl: previewRes.previewUrl,
         previewStatus: previewRes.previewStatus,
@@ -1160,12 +1233,32 @@ export async function runGallerySync(options: SyncOptions): Promise<SyncResult> 
   stats.prunedOrphans = await pruneOrphanPreviews(projectRoot, activeIds, cache);
   await saveSyncCache(cachePath, cache);
 
+  const folderSummaries: ManifestFolderSummary[] = parsedFolders.map((pf) => {
+    const itemsInFolder =
+      parsedFolders.length > 1
+        ? manifestItems.filter((item) => item.folderId === pf.id)
+        : manifestItems;
+    const coverThumbs = itemsInFolder
+      .filter((item) => item.previewStatus === 'ready' && Boolean(item.thumbUrl))
+      .slice(0, 3)
+      .map((item) => item.thumbUrl as string);
+    return {
+      id: pf.id,
+      title: pf.title,
+      ...(pf.subtitle ? { subtitle: pf.subtitle } : {}),
+      driveFolderId: pf.driveFolderId,
+      photoCount: itemsInFolder.length,
+      coverThumbs,
+    };
+  });
+
   const manifest: GalleryManifest = {
     schemaVersion: 1,
     status: 'ready',
     sourceMode: 'folder',
     generatedAt: new Date().toISOString(),
-    folderId: parsedFolder.folderId,
+    folderId: parsedFolders[0]?.driveFolderId ?? null,
+    ...(parsedFolders.length > 1 ? { folders: folderSummaries } : {}),
     totalPhotos: manifestItems.length,
     photos: manifestItems,
   };

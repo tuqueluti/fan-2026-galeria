@@ -124,7 +124,7 @@ async function main() {
 
   const rawConcurrency = process.env.SYNC_CONCURRENCY
     ? Number.parseInt(process.env.SYNC_CONCURRENCY, 10)
-    : 6;
+    : 12;
 
   const logger = {
     info: (msg) => console.log(msg),
@@ -168,6 +168,11 @@ async function main() {
   console.log(
     `  - Fotos publicadas (${galleryConfig.photoPrefix}-1..${galleryConfig.photoPrefix}-${manifest.totalPhotos}): ${manifest.totalPhotos}`,
   );
+  if (Array.isArray(manifest.folders) && manifest.folders.length > 0) {
+    for (const f of manifest.folders) {
+      console.log(`    · Pasta "${f.title}" (${f.id}): ${f.photoCount} fotos`);
+    }
+  }
   console.log(`  - Prévias geradas nesta execução: ${stats.generatedPreviews}`);
   console.log(`  - Prévias reaproveitadas do cache: ${stats.cacheHits}`);
   if (stats.failedPreviews > 0) {

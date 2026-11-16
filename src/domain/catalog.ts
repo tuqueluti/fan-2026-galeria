@@ -1,6 +1,7 @@
 import type {
   CatalogPhoto,
   GalleryConfig,
+  GalleryFolderConfig,
   GalleryManifest,
   GallerySortBy,
   ManifestPhotoItem,
@@ -212,12 +213,100 @@ export function assignSequentialCodes(
   });
 }
 
+export interface CatalogFolderView {
+  id: string;
+  title: string;
+  subtitle?: string;
+  photoCount: number;
+  firstCode: string | null;
+  lastCode: string | null;
+  coverThumbs: string[];
+}
+
 export interface ResolvedCatalogState {
   state: 'ready' | 'empty_unconfigured' | 'empty_configured' | 'config_error';
   photos: CatalogPhoto[];
+  folders: CatalogFolderView[];
   totalPhotos: number;
   /** Mensagem segura e clara voltada ao visitante (sem instruções de API ou código) */
   visitorNotice?: string;
+}
+
+/**
+ * Resolve a lista efetiva de pastas configuradas em `gallery.ts`.
+ * Quando `driveFolderUrl` foi sobrescrito explicitamente (ex.: pasta única customizada ou teste),
+ * respeita essa pasta única; caso contrário utiliza todas as pastas declaradas em `config.folders`.
+ */
+export function resolveConfiguredFolders(config: GalleryConfig): GalleryFolderConfig[] {
+  const declared = Array.isArray(config.folders) ? config.folders.filter(Boolean) : [];
+  if (
+    declared.length > 0 &&
+    (!config.driveFolderUrl || config.driveFolderUrl.trim() === declared[0].driveFolderUrl.trim())
+  ) {
+    return declared;
+  }
+
+  return [
+    {
+      id: 'acervo',
+      title: config.eventName || 'Fotos do Evento',
+      driveFolderUrl: config.driveFolderUrl,
+      includeSubfolders: config.includeSubfolders,
+    },
+  ];
+}
+
+function buildFolderViews(
+  configuredFolders: readonly GalleryFolderConfig[],
+  numberedPhotos: readonly CatalogPhoto[],
+): CatalogFolderView[] {
+  if (configuredFolders.length <= 1) {
+    if (configuredFolders.length === 0) return [];
+    const only = configuredFolders[0];
+    const thumbs = numberedPhotos
+      .filter((p) => p.previewStatus === 'ready' && Boolean(p.thumbUrl))
+      .slice(0, 3)
+      .map((p) => p.thumbUrl as string);
+    return [
+      {
+        id: only.id,
+        title: only.title,
+        subtitle: only.subtitle,
+        photoCount: numberedPhotos.length,
+        firstCode: numberedPhotos[0]?.code ?? null,
+        lastCode: numberedPhotos[numberedPhotos.length - 1]?.code ?? null,
+        coverThumbs: thumbs,
+      },
+    ];
+  }
+
+  const byFolderId = new Map<string, CatalogPhoto[]>();
+  for (const cfg of configuredFolders) {
+    byFolderId.set(cfg.id, []);
+  }
+
+  for (const photo of numberedPhotos) {
+    const targetId =
+      photo.folderId && byFolderId.has(photo.folderId) ? photo.folderId : configuredFolders[0].id;
+    byFolderId.get(targetId)!.push(photo);
+  }
+
+  return configuredFolders.map((cfg) => {
+    const list = byFolderId.get(cfg.id) ?? [];
+    const thumbs = list
+      .filter((p) => p.previewStatus === 'ready' && Boolean(p.thumbUrl))
+      .slice(0, 3)
+      .map((p) => p.thumbUrl as string);
+    return {
+      id: cfg.id,
+      title: cfg.title,
+      subtitle: cfg.subtitle,
+      photoCount: list.length,
+      firstCode: list[0]?.code ?? null,
+      lastCode: list[list.length - 1]?.code ?? null,
+      coverThumbs: thumbs,
+    };
+  });
 }
 
 /**
@@ -235,6 +324,7 @@ export function resolvePublishedCatalog(
       return {
         state: 'empty_unconfigured',
         photos: [],
+        folders: [],
         totalPhotos: 0,
         visitorNotice:
           'As fotografias oficiais do FAN 2026 estão sendo organizadas e estarão disponíveis para download gratuito nesta página em breve.',
@@ -254,6 +344,7 @@ export function resolvePublishedCatalog(
       return {
         state: 'config_error',
         photos: [],
+        folders: [],
         totalPhotos: 0,
         visitorNotice:
           'Não foi possível carregar o catálogo de fotos neste momento. Tente novamente mais tarde.',
@@ -284,26 +375,34 @@ export function resolvePublishedCatalog(
     return {
       state: 'ready',
       photos: numbered,
+      folders: [],
       totalPhotos: numbered.length,
     };
   }
 
   // Modo pasta ("folder")
-  const parsedFolder = parseDriveFolderInput(config.driveFolderUrl);
-  if (parsedFolder.kind === 'unconfigured') {
+  const configuredFolders = resolveConfiguredFolders(config);
+  const parsedList = configuredFolders.map((f) => ({
+    cfg: f,
+    parsed: parseDriveFolderInput(f.driveFolderUrl),
+  }));
+
+  if (parsedList.some((entry) => entry.parsed.kind === 'unconfigured')) {
     return {
       state: 'empty_unconfigured',
       photos: [],
+      folders: [],
       totalPhotos: 0,
       visitorNotice:
         'As fotografias oficiais do FAN 2026 estão sendo preparadas e serão publicadas aqui em breve.',
     };
   }
 
-  if (parsedFolder.kind === 'invalid') {
+  if (parsedList.some((entry) => entry.parsed.kind === 'invalid')) {
     return {
       state: 'config_error',
       photos: [],
+      folders: [],
       totalPhotos: 0,
       visitorNotice:
         'O acervo fotográfico passa por atualização no momento. Volte em instantes para acessar os registros do evento.',
@@ -314,17 +413,27 @@ export function resolvePublishedCatalog(
     return {
       state: 'config_error',
       photos: [],
+      folders: [],
       totalPhotos: 0,
       visitorNotice:
         'Não foi possível carregar as prévias sincronizadas do evento neste momento.',
     };
   }
 
-  // Garante que o manifesto corresponde à pasta atualmente configurada em gallery.ts
-  if (manifest.folderId && manifest.folderId !== parsedFolder.folderId) {
+  const firstParsed = parsedList[0]?.parsed;
+  const expectedPrimaryFolderId = firstParsed && firstParsed.kind === 'ok' ? firstParsed.folderId : null;
+
+  // Garante que o manifesto corresponde à configuração atual em gallery.ts
+  if (
+    configuredFolders.length === 1 &&
+    manifest.folderId &&
+    expectedPrimaryFolderId &&
+    manifest.folderId !== expectedPrimaryFolderId
+  ) {
     return {
       state: 'empty_configured',
       photos: [],
+      folders: [],
       totalPhotos: 0,
       visitorNotice:
         'O catálogo fotográfico foi atualizado e aguarda a publicação das novas prévias.',
@@ -342,6 +451,7 @@ export function resolvePublishedCatalog(
     return {
       state: manifest.status === 'ready' ? 'empty_configured' : 'empty_unconfigured',
       photos: [],
+      folders: buildFolderViews(configuredFolders, []),
       totalPhotos: 0,
       visitorNotice:
         manifest.status === 'ready'
@@ -351,9 +461,12 @@ export function resolvePublishedCatalog(
   }
 
   const numbered = assignSequentialCodes(validManifestPhotos, prefix);
+  const folderViews = buildFolderViews(configuredFolders, numbered);
+
   return {
     state: 'ready',
     photos: numbered,
+    folders: folderViews,
     totalPhotos: numbered.length,
   };
 }

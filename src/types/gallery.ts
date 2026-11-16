@@ -62,6 +62,19 @@ export interface GalleryInstitutionalLinks {
   photoRemovalContact?: string;
 }
 
+export interface GalleryFolderConfig {
+  /** Identificador estável da pasta na interface (ex.: "dia-01", "rodada-negocios", "dia-02") */
+  id: string;
+  /** Título público exibido na pasta (ex.: "Dia 01", "Rodada de Negócios", "Dia 02") */
+  title: string;
+  /** Subtítulo opcional exibido no cartão da pasta */
+  subtitle?: string;
+  /** Link público da pasta no Google Drive */
+  driveFolderUrl: string;
+  /** Quando true, percorre subpastas desta pasta (padrão: false) */
+  includeSubfolders?: boolean;
+}
+
 export interface GalleryConfig {
   /** Nome principal do evento exibido na abertura e no cabeçalho de contexto */
   eventName: string;
@@ -75,8 +88,13 @@ export interface GalleryConfig {
   photoPrefix: string;
   /** Origem do catálogo: "folder" (pasta pública do Drive sincronizada no build) ou "manual" (lista individual) */
   sourceMode: SourceMode;
-  /** Link público da pasta no Google Drive usado pelo script de sincronização quando sourceMode = "folder" */
+  /** Link público da pasta principal no Google Drive quando usado modo de pasta única */
   driveFolderUrl: string;
+  /**
+   * Lista opcional de múltiplas pastas/álbuns do evento no Google Drive (ex.: Dia 01, Rodada de Negócios, Dia 02).
+   * Quando preenchida, cada pasta é sincronizada na ordem declarada e exibida como pasta interativa na galeria.
+   */
+  folders?: GalleryFolderConfig[];
   /**
    * Quando true, percorre subpastas explicitamente durante a sincronização da pasta do Drive.
    * Por padrão deve permanecer false (apenas arquivos diretos da pasta configurada).
@@ -109,6 +127,8 @@ export interface GalleryConfig {
 export interface ManifestPhotoItem {
   fileId: string;
   originalName?: string;
+  folderId?: string;
+  folderTitle?: string;
   thumbUrl: string | null;
   previewUrl: string | null;
   previewStatus: PreviewStatus;
@@ -122,6 +142,15 @@ export interface ManifestPhotoItem {
   modifiedTime?: string;
 }
 
+export interface ManifestFolderSummary {
+  id: string;
+  title: string;
+  subtitle?: string;
+  driveFolderId: string;
+  photoCount: number;
+  coverThumbs: string[];
+}
+
 export type ManifestStatus = 'unconfigured' | 'ready' | 'error';
 
 export interface GalleryManifest {
@@ -130,6 +159,7 @@ export interface GalleryManifest {
   sourceMode: SourceMode;
   generatedAt: string | null;
   folderId?: string | null;
+  folders?: ManifestFolderSummary[];
   totalPhotos: number;
   photos: ManifestPhotoItem[];
 }
