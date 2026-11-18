@@ -49,7 +49,7 @@ export const galleryConfig: GalleryConfig = {
       id: 'dia-02',
       title: 'Dia 02',
       subtitle: 'Painéis, networking e encerramento',
-      driveFolderUrl: 'https://drive.google.com/drive/folders/13YG0dvKlxS-2emgQROl-HCgNHJswMRxB',
+      driveFolderUrl: 'https://drive.google.com/drive/folders/1jUO8TACtOOj1gpDm2iKelGY8kbifgQLw',
       includeSubfolders: false,
     },
   ],

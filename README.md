@@ -24,7 +24,7 @@ Situação entregue no projeto:
 - `public/logos/moove-connect.png` e `public/logos/moove-symbol.png`: integrados com os arquivos PNG transparentes oficiais da Moove Connect (`moove.marketing`).
 - `public/logos/aciva.png`: integrado com o arquivo PNG transparente oficial da ACIVA para fundo escuro (`acivaararangua.com.br`).
 - `public/logos/fan-2026.png`: **pendente de arquivo oficial**. Como não há PNG transparente isolado da marca do FAN 2026 publicado fora das peças gráficas compostas do evento, nenhum logotipo foi redesenhado ou improvisado. Basta salvar o arquivo oficial transparente em `public/logos/fan-2026.png` para que a abertura e o rodapé passem a exibi-lo automaticamente.
-- Origem de fotos (`src/config/gallery.ts`): configurada e sincronizada com a pasta oficial do evento (`1Lnh0VZpmXKEU8YLWIGv86oz0s9mpJWXu`, incluindo a subpasta `Dia 01` via `includeSubfolders: true`), totalizando **207 fotografias publicadas** (`FAN-1` até `FAN-207`) com prévias leves em WebP e download individual direto do Google Drive.
+- Origem de fotos (`src/config/gallery.ts`): configurada e sincronizada com as 3 pastas oficiais do evento (`Dia 01`: `1QFfJWszyaxW0bu9ezGU6E1GDo5BUoD9E` com 207 fotos, `Rodada de Negócios`: `1Tk8_I4Mo30KTjYS8qNP27EnBF5EhOiBU` com 127 fotos e `Dia 02`: `1jUO8TACtOOj1gpDm2iKelGY8kbifgQLw` com 84 fotos), totalizando **418 fotografias publicadas** (`FAN-1` até `FAN-418`) com prévias leves em WebP e download individual direto do Google Drive.
 
 ## Requisitos e instalação
 
